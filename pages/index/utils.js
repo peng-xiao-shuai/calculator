@@ -23,5 +23,6 @@ export const operation = (num1, num2, symbol) => {
 				break;
 		}
 		
-		return String(num)
+		// 为8主要是ios最大为8为小数
+		return String(parseFloat(num.toPrecision(8)))
 	}

@@ -179,7 +179,7 @@
 						break;
 					// 数字
 					default:
-						if (this.viewValue.length > 9) {
+						if (this.viewValue.length > (String(this.viewValue).indexOf('.') != -1 ? 9 : 8)) {
 							return
 						}
 						if (isSymbol()) {
