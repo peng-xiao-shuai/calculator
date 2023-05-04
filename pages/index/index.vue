@@ -14,15 +14,19 @@
 </template>
 
 <script>
-	import { KEYS, symbolReg1, symbolReg2, symbolReg3, operation, formatt } from './utils';
+	import { KEYS, symbolReg1, symbolReg2, symbolReg3, operation, computeCount } from './utils';
 	// 计算逻辑
 	let computes = []
 	// 存储最后操作符 0 为操作符，1为值
 	let cacheLastSymbol = []
+	
 	// 乘除运算符次数
 	let countSymbol1 = 0
 	// 加减
 	let countSymbol2 = 0
+	
+	// 修改状态 0 不需要操作栈，1删除栈中倒数第二个符号自身、上一个以及下一个下标，2删除倒数第一个符号之前的栈，使用viewValue代替
+	let editStatus = 0
 
 	// 判断最后一个是否为计算符号
 	const isSymbol = () => {
@@ -39,8 +43,9 @@
 		let num = undefined
 		for(let i = 1; i <= count; i++) {
 			// 乘除号下标, 3、7下标除、乘
+			console.log(computes);
 			const index = computes.findIndex(symbol => type === '0' ? symbolReg2.test(symbol) : symbolReg1.test(symbol))
-			
+			if (index == -1) return
 			// 进行计算
 			// 这里可以使用 eval将字符串当做js执行, 需要去判断 *
 			if (index === computes.length - 1) { // 如果最后一个是字符而非数字的情况
@@ -115,29 +120,56 @@
 					case KEYS[3 * 4 - 1]:
 					case KEYS[4 * 4 - 1]:
 						// 不能一开始就是符号
-						if (computes.length > 0) {
-							if (isSymbol()) {
-								computes[computes.length - 1] = target.dataset.text
-							} else {
-								computes.push(target.dataset.text)
-								// 加入统计字符
-								if (symbolReg1.test(target.dataset.text)) countSymbol1++
-								if (symbolReg2.test(target.dataset.text)) countSymbol2++
+						if (computes.length == 0) return
+						
+						if (isSymbol()) {
+							// 改变符号
+							computes[computes.length - 1] = target.dataset.text
+						} else {
+							computes.push(target.dataset.text)
+							// 加入统计字符
+							if (symbolReg1.test(target.dataset.text)) countSymbol1++
+							if (symbolReg2.test(target.dataset.text)) countSymbol2++
+						}
+						
+						if (computes.length > 3) {
+							const previousSymbolIndex = computes.length - 3
+							// 判断上一个符号是否是乘除 && 当前符号为加减
+							if (symbolReg1.test(computes[previousSymbolIndex]) && symbolReg2.test(target.dataset.text)) {
+								
+								this.viewValue = computeCount([...computes])
+								// console.log('上个乘除当前符号加减', this.viewValue);
+								editStatus = 2
+							}
+							// 上个符号和当前符号 一样的类型
+							if (
+								(symbolReg1.test(computes[previousSymbolIndex]) && symbolReg1.test(target.dataset.text)) ||
+								(symbolReg2.test(computes[previousSymbolIndex]) && symbolReg2.test(target.dataset.text))
+							) {
+								// console.log('符号相同');
+								this.viewValue = operation(computes[previousSymbolIndex - 1], computes[previousSymbolIndex + 1], computes[previousSymbolIndex])
+								editStatus = 1
+							}
+							
+							if (!editStatus) {
+								this.viewValue = computes[computes.length - 2]
+								editStatus = 0
 							}
 						}
+						
 						break;
 					// 等于
 					case KEYS[KEYS.length - 1]:
 						if (cacheLastSymbol.length == 2) { // 第一次计算结束
 							computes[0] = operation(computes[0], cacheLastSymbol[1], cacheLastSymbol[0])
 						}
-					
 						if (countSymbol1 || countSymbol2) { // 存在操作符时，将操作符加入缓存变量
 							if (isSymbol()) { // 判断最后一个是操作符则取操作符前一个
-								cacheLastSymbol.push(computes[computes.length - 1])
+								cacheLastSymbol[0] = computes[computes.length - 1]
+								cacheLastSymbol[1] = computes[computes.length - 2]
 							} else {
-								cacheLastSymbol.push(computes[computes.length - 2])
-								cacheLastSymbol.push(computes[computes.length - 1])
+								cacheLastSymbol[0] = computes[computes.length - 2]
+								cacheLastSymbol[1] = computes[computes.length - 1]
 							}
 						}
 					
@@ -182,6 +214,16 @@
 						if (this.viewValue.length > (String(this.viewValue).indexOf('.') != -1 ? 9 : 8)) {
 							return
 						}
+						
+						if (editStatus) {
+							if (editStatus === 1) {
+								const previousSymbolIndex = computes.length - 3
+								computes.splice(previousSymbolIndex - 1, 3, operation(computes[previousSymbolIndex - 1], computes[previousSymbolIndex + 1], computes[previousSymbolIndex]))
+							}
+							if (editStatus === 2) computes.splice(0, computes.length - 1, this.viewValue)
+							editStatus = 0
+						}
+						
 						if (isSymbol()) {
 							this.viewValue = target.dataset.text
 							computes.push(this.viewValue)
@@ -199,6 +241,8 @@
 						
 						this.btns[0].text = computes.length > 0 || this.viewValue > 0 ? 'C' : KEYS[0]
 				}
+				
+				console.log(computes);
 				
 			},
 			// 格式化
